@@ -1,0 +1,60 @@
+--- a/Makefile
++++ b/Makefile
+@@ -308,8 +308,10 @@
+ 
+ ifeq ($(UNAME_M),$(filter $(UNAME_M),x86_64 i686 amd64))
+ 	# Use all CPU extensions that are available:
++	ifndef LLAMA_NO_NATIVE
+ 	MK_CFLAGS     += -march=native -mtune=native
+ 	HOST_CXXFLAGS += -march=native -mtune=native
++endif
+ 
+ 	# Usage AVX-only
+ 	#MK_CFLAGS   += -mfma -mf16c -mavx
+@@ -500,7 +502,7 @@
+ 
+ ifdef JETSON_EOL_MODULE_DETECT
+ define NVCC_COMPILE
+-	$(NVCC) -I. -Icommon -D_XOPEN_SOURCE=600 -D_GNU_SOURCE -DNDEBUG -DGGML_USE_CUDA -I/usr/local/cuda/include -I/opt/cuda/include -I/usr/local/cuda/targets/aarch64-linux/include -std=c++11 -O3 $(NVCCFLAGS) $(CPPFLAGS) -Xcompiler "$(CUDA_CXXFLAGS)" -c $< -o $@
++	$(NVCC) -I. -Icommon -D_XOPEN_SOURCE=600 -D_GNU_SOURCE -DNDEBUG -DGGML_USE_CUDA -I/usr/local/cuda/include -I/opt/cuda/include -I/usr/local/cuda/targets/aarch64-linux/include $(NVCCFLAGS) $(CPPFLAGS) -Xcompiler "$(CUDA_CXXFLAGS)" -c $< -o $@
+ endef # NVCC_COMPILE
+ else
+ define NVCC_COMPILE
+--- a/ggml-cuda.cu
++++ b/ggml-cuda.cu
+@@ -1895,7 +1895,7 @@
+     // check data types and tensor shapes for custom matrix multiplication kernels:
+     bool use_dequantize_mul_mat_vec = (ggml_is_quantized(src0->type) || src0->type == GGML_TYPE_F16)
+         && src1->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32
+-        && src0->ne[0] % GGML_CUDA_DMMV_X == 0 && src1->ne[1] == 1;
++        && src0->ne[0] % (min_compute_capability < 500 ? 2*GGML_CUDA_DMMV_X : GGML_CUDA_DMMV_X) == 0 && src1->ne[1] == 1;
+ 
+     bool          use_mul_mat_vec_q =  ggml_is_quantized(src0->type)
+         && src1->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32
+@@ -1948,7 +1948,7 @@
+     } else if (!split && !fp16_performance_good && src0->type == GGML_TYPE_F16 && !ggml_is_contiguous(src0) && !ggml_is_transposed(src1) && src1->ne[1] == 1) {
+         // KQV single-batch
+         ggml_cuda_mul_mat_vec_nc(ctx, src0, src1, dst);
+-    } else if (!split && src0->type == GGML_TYPE_F16 && (src1->type == GGML_TYPE_F16 || fp16_performance_good) && !ggml_is_transposed(src0) && !ggml_is_transposed(src1) && src1->ne[2]*src1->ne[3] > 1) {
++    } else if (!split && min_compute_capability >= 500 && src0->type == GGML_TYPE_F16 && (src1->type == GGML_TYPE_F16 || fp16_performance_good) && !ggml_is_transposed(src0) && !ggml_is_transposed(src1) && src1->ne[2]*src1->ne[3] > 1) {
+         // KQ + KQV multi-batch
+         ggml_cuda_mul_mat_batched_cublas(ctx, src0, src1, dst);
+     } else if (use_dequantize_mul_mat_vec) {
+--- a/ggml-cuda/common.cuh
++++ b/ggml-cuda/common.cuh
+@@ -571,7 +571,14 @@
+         if (cublas_handles[device] == nullptr) {
+             ggml_cuda_set_device(device);
+             CUBLAS_CHECK(cublasCreate(&cublas_handles[device]));
+-            CUBLAS_CHECK(cublasSetMathMode(cublas_handles[device], CUBLAS_TF32_TENSOR_OP_MATH));
++            #ifndef GGML_USE_HIPBLAS
++            const int cc = ggml_cuda_info().devices[device].cc;
++            cublasMath_t mode = CUBLAS_DEFAULT_MATH;
++            if (cc >= CC_VOLTA) {
++                mode = CUBLAS_TF32_TENSOR_OP_MATH;
++            }
++            CUBLAS_CHECK(cublasSetMathMode(cublas_handles[device], mode));
++#endif
+         }
+         return cublas_handles[device];
+     }

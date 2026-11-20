@@ -1,0 +1,23 @@
+services:
+  ollama:
+    image: ${OLLAMA_LEGACY_IMAGE:-ollama-cuda10:local}
+    pull_policy: never
+    build:
+      context: .
+      args:
+        CUDA_ARCH: "${CUDA_ARCH:-30}"
+    ports:
+      - "127.0.0.1:${OLLAMA_PORT:-11434}:11434"
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_NO_CLOUD: "1"
+      OLLAMA_GO_TEMPLATE: "1"
+      OLLAMA_CONTEXT_LENGTH: "${OLLAMA_CONTEXT_LENGTH:-512}"
+      LEGACY_CUDA_GPU_LAYERS: "${LEGACY_CUDA_GPU_LAYERS:-24}"
+    volumes:
+      - models:/var/lib/ollama
+    devices:
+      - "${NVIDIA_CDI_DEVICE:-nvidia.com/gpu=0}"
+
+volumes:
+  models:
