@@ -25,15 +25,14 @@ RUN python3 /fetch-ollama.py /ollama
 FROM debian:13-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libstdc++6 libgomp1 ca-certificates python3 \
-    && rm -rf /var/lib/apt/lists/* \
-    && install -d -o 65534 -g 65534 /var/lib/ollama
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=cuda-build /cuda-runtime/ /opt/cuda102/
 COPY --from=cuda-build /build/llama.cpp/server /usr/lib/ollama/llama-server-legacy
 COPY --from=cuda-build /cuda-arch /cuda-device-info /usr/lib/ollama/
 COPY --from=upstream-ollama /ollama /usr/bin/ollama
 COPY --chmod=755 llama-server-compat.py /usr/lib/ollama/llama-server
 COPY LICENSE.llama.cpp LICENSE.ollama /usr/share/doc/ollama-cuda10/
-ENV LD_LIBRARY_PATH=/opt/cuda102 HOME=/var/lib/ollama OLLAMA_MODELS=/var/lib/ollama/models
-USER 65534:65534
+ENV LD_LIBRARY_PATH=/opt/cuda102 OLLAMA_HOST=0.0.0.0:11434
+EXPOSE 11434
 ENTRYPOINT ["/usr/bin/ollama"]
 CMD ["serve"]

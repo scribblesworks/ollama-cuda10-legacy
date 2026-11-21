@@ -58,7 +58,9 @@ curl -fsS http://127.0.0.1:11434/api/generate \
 docker compose logs ollama
 ```
 
-Check the logs for a positive GPU layer-offload count. Set `LEGACY_CUDA_GPU_LAYERS` or use the request option `num_gpu` to adjust offload. Lower the layer count and context length if GPU memory is limited. Ollama stores models in the Compose volume. `docker compose down` stops the service and retains that volume.
+Check the logs for a positive GPU layer-offload count. Set `LEGACY_CUDA_GPU_LAYERS` or use the request option `num_gpu` to adjust offload. Lower the layer count and context length if GPU memory is limited. Ollama runs as root inside the container and uses `/root/.ollama` for state and models, as in the official image. `docker compose down` stops the service and retains the volume.
+
+If you use a separate Compose file with the previous image, mount the same volume or host directory at `/root/.ollama` instead of `/var/lib/ollama`. Remove any old `HOME`, `OLLAMA_MODELS`, or `user: "65534:65534"` overrides. The existing top-level `models/` directory will be picked up at the new mount point.
 
 ## Test and limitations
 

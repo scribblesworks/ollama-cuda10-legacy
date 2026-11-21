@@ -7,8 +7,8 @@ port="${TEST_PORT:-11436}"
 image="${OLLAMA_LEGACY_IMAGE:-ollama-cuda10:local}"
 candidate=ollama-cuda10-test-$$
 docker run -d --rm --name "$candidate" --device "$device" \
-    -p "127.0.0.1:$port:11434" -v /var/lib/ollama \
-    -e OLLAMA_HOST=0.0.0.0:11434 -e OLLAMA_NO_CLOUD=1 -e OLLAMA_GO_TEMPLATE=1 \
+    -p "127.0.0.1:$port:11434" -v /root/.ollama \
+    -e OLLAMA_NO_CLOUD=1 -e OLLAMA_GO_TEMPLATE=1 \
     -e OLLAMA_CONTEXT_LENGTH=512 "$image" >/dev/null
 cleanup() {
     local status=$?
